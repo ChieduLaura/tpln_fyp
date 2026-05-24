@@ -1,0 +1,117 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15
+    env_file: .env
+    environment:
+      POSTGRES_DB: tpln_db
+      POSTGRES_USER: tpln_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tpln-network
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tpln_user -d tpln_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo:
+    image: mongo:6
+    command: ["--bind_ip_all"]
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - tpln-network
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    networks:
+      - tpln-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    networks:
+      - tpln-network
+    depends_on:
+      - core-service
+
+  core-service:
+    build:
+      context: ./services/core-service
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: "postgresql://tpln_user:tpln_password123@localhost:5432/tpln_db"
+      MONGO_URL: "mongodb://mongo:27017"
+      REDIS_URL: "redis://redis:6379"
+    networks:
+      - tpln-network
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+
+  ai-estimation:
+    build:
+      context: ./services/ai-estimation
+    ports:
+      - "8001:8000"
+    networks:
+      - tpln-network
+    depends_on:
+      - core-service
+
+  forecasting:
+    build:
+      context: ./services/forecasting
+    ports:
+      - "8002:8000"
+    networks:
+      - tpln-network
+    depends_on:
+      - core-service
+
+  explainability:
+    build:
+      context: ./services/explainability
+    ports:
+      - "8003:8000"
+    networks:
+      - tpln-network
+    depends_on:
+      - core-service
+
+  gen-planning:
+    build:
+      context: ./services/gen-planning
+    ports:
+      - "8004:8000"
+    networks:
+      - tpln-network
+    depends_on:
+      - core-service
+
+volumes:
+  postgres_data:
+  mongo_data:
+
+networks:
+  tpln-network:
+    driver: bridge
