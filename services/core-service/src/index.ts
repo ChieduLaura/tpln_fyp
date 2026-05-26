@@ -4,12 +4,18 @@ import express from "express";
 import { Pool } from "pg";
 import mongoose from "mongoose";
 import authRouter from "./routes/auth";
+import projectsRouter from "./routes/projects";
+import tasksRouter from "./routes/tasks";
+import { lifecycleMiddleware } from "./middleware/lifecycle";
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
 
 app.use(express.json());
+app.use(lifecycleMiddleware);
 app.use("/auth", authRouter);
+app.use(projectsRouter);
+app.use(tasksRouter);
 
 const databaseUrl = process.env.DATABASE_URL;
 const mongoUri = process.env.MONGODB_URI;
