@@ -1,6 +1,10 @@
 -- PostgreSQL schema for TPLN core-service
+-- Keep the app data isolated from the default public schema.
+CREATE SCHEMA IF NOT EXISTS tpln AUTHORIZATION CURRENT_USER;
+SET search_path TO tpln, public;
+
 -- Extensions
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA tpln;
 
 -- Enums
 DO $$ BEGIN
@@ -37,6 +41,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS users_set_updated_at ON users;
 CREATE TRIGGER users_set_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
@@ -59,9 +64,11 @@ CREATE TABLE IF NOT EXISTS projects (
     start_date date,
     end_date date,
     created_by uuid REFERENCES users(id) ON DELETE SET NULL,
+    deleted_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS projects_set_updated_at ON projects;
 CREATE TRIGGER projects_set_updated_at
     BEFORE UPDATE ON projects
     FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
@@ -84,6 +91,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS tasks_set_updated_at ON tasks;
 CREATE TRIGGER tasks_set_updated_at
     BEFORE UPDATE ON tasks
     FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
@@ -114,8 +122,31 @@ CREATE TABLE IF NOT EXISTS ai_predictions (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Task lifecycle history
+CREATE TABLE IF NOT EXISTS task_lifecycle (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    old_status task_status,
+    new_status task_status NOT NULL,
+    changed_by uuid REFERENCES users(id) ON DELETE SET NULL,
+    changed_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Project forecasts
+CREATE TABLE IF NOT EXISTS project_forecasts (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    risk_probability numeric(5,4) NOT NULL,
+    will_slip boolean NOT NULL,
+    forecasted_completion_date date,
+    confidence text NOT NULL,
+    top_risk_factors jsonb NOT NULL DEFAULT '[]'::jsonb,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Optional indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 CREATE INDEX IF NOT EXISTS idx_projects_org_id ON projects (org_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks (project_id);
 CREATE INDEX IF NOT EXISTS idx_ai_predictions_task_id ON ai_predictions (task_id);
+CREATE INDEX IF NOT EXISTS idx_project_forecasts_project_id ON project_forecasts (project_id);

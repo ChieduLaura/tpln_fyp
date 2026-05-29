@@ -3,6 +3,7 @@ import { Pool } from "pg";
 import axios from "axios";
 import { z } from "zod";
 import { requireAuth } from "../middleware/auth";
+import { notificationService } from "../services/notificationService";
 
 const router = Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -204,6 +205,8 @@ router.post("/projects/:projectId/tasks", async (req: Request, res: Response) =>
       [task.id]
     );
 
+    notificationService.broadcastTaskUpdate(projectId, taskResult.rows[0]);
+
     res.status(201).json({ task: taskResult.rows[0] });
   } catch (error) {
     console.error("Create task error:", error);
@@ -330,6 +333,8 @@ router.put("/tasks/:id", async (req: Request, res: Response) => {
       ]
     );
 
+    notificationService.broadcastTaskUpdate(result.rows[0].project_id, result.rows[0]);
+
     res.status(200).json({ task: result.rows[0] });
   } catch (error) {
     console.error("Update task error:", error);
@@ -389,6 +394,8 @@ router.patch("/tasks/:id/status", async (req: Request, res: Response) => {
        VALUES ($1, $2, $3, $4)`,
       [taskId, oldStatus, newStatus, req.user.id]
     );
+
+    notificationService.broadcastTaskUpdate(updatedResult.rows[0].project_id, updatedResult.rows[0]);
 
     res.status(200).json({ task: updatedResult.rows[0] });
   } catch (error) {

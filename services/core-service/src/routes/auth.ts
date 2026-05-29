@@ -1,12 +1,11 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt, { type SignOptions } from "jsonwebtoken";
-import { Pool } from "pg";
 import { z } from "zod";
 import { requireAuth } from "../middleware/auth";
+import pool from "../db/pool";
 
 const router = Router();
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const JWT_SECRET = process.env.JWT_SECRET;
 const ACCESS_TOKEN_TTL = (process.env.JWT_EXPIRES_IN || "15m") as SignOptions["expiresIn"];
 const REFRESH_TOKEN_TTL = (process.env.REFRESH_TOKEN_EXPIRES_IN || "7d") as SignOptions["expiresIn"];

@@ -4,7 +4,10 @@ import { Client, ClientConfig } from 'pg';
 
 async function getClient(): Promise<Client> {
   if (process.env.DATABASE_URL) {
-    return new Client({ connectionString: process.env.DATABASE_URL } as ClientConfig);
+    return new Client({
+      connectionString: process.env.DATABASE_URL,
+      options: "-c search_path=tpln,public"
+    } as ClientConfig);
   }
 
   const cfg: ClientConfig = {
@@ -13,6 +16,7 @@ async function getClient(): Promise<Client> {
     user: process.env.PGUSER || process.env.USER,
     password: process.env.PGPASSWORD,
     database: process.env.PGDATABASE || 'postgres',
+    options: "-c search_path=tpln,public"
   };
   return new Client(cfg);
 }

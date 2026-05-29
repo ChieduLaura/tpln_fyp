@@ -1,15 +1,13 @@
-version: '3.9'
-
 services:
   postgres:
     image: postgres:15
-    env_file: .env
     environment:
       POSTGRES_DB: tpln_db
       POSTGRES_USER: tpln_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: tpln_password123
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - tpln-network
     ports:
@@ -46,7 +44,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:4000
     networks:
       - tpln-network
     depends_on:
@@ -58,21 +57,29 @@ services:
     ports:
       - "4000:4000"
     environment:
-      DATABASE_URL: "postgresql://tpln_user:tpln_password123@localhost:5432/tpln_db"
-      MONGO_URL: "mongodb://mongo:27017"
+      DATABASE_URL: "postgresql://tpln_user:tpln_password123@postgres:5432/tpln_db"
+      MONGODB_URI: "mongodb://mongo:27017/tpln_lifecycle"
       REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: "supersecretjwtkey123456789"
+      NODE_ENV: development
+      PORT: "4000"
     networks:
       - tpln-network
     depends_on:
-      - postgres
-      - mongo
-      - redis
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+      redis:
+        condition: service_started
 
   ai-estimation:
     build:
       context: ./services/ai-estimation
     ports:
       - "8001:8000"
+    environment:
+      CORE_SERVICE_URL: http://core-service:4000
     networks:
       - tpln-network
     depends_on:
@@ -82,7 +89,9 @@ services:
     build:
       context: ./services/forecasting
     ports:
-      - "8002:8000"
+      - "8002:8002"
+    environment:
+      CORE_SERVICE_URL: http://core-service:4000
     networks:
       - tpln-network
     depends_on:
@@ -93,6 +102,8 @@ services:
       context: ./services/explainability
     ports:
       - "8003:8000"
+    environment:
+      CORE_SERVICE_URL: http://core-service:4000
     networks:
       - tpln-network
     depends_on:
@@ -102,7 +113,10 @@ services:
     build:
       context: ./services/gen-planning
     ports:
-      - "8004:8000"
+      - "8004:8004"
+    environment:
+      CORE_SERVICE_URL: http://core-service:4000
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     networks:
       - tpln-network
     depends_on:
